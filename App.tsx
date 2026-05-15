@@ -17,6 +17,7 @@ import * as turf from '@turf/turf';
 // -----------------------------------
 // GEOLOCATION CONFIG
 // -----------------------------------
+
 Geolocation.setRNConfiguration({
   skipPermissionRequests: false,
   authorizationLevel: 'whenInUse',
@@ -27,6 +28,7 @@ Geolocation.setRNConfiguration({
 // -----------------------------------
 // GEOFENCE AREA
 // -----------------------------------
+
 const POLYGON_COORDINATES = [
   {
     latitude: 22.72345,
@@ -49,27 +51,43 @@ const POLYGON_COORDINATES = [
 const App: React.FC = () => {
   const mapRef = useRef<MapView | null>(null);
 
-  // Prevent Repeated Alerts
+  // Prevent repeated alerts
   const previousStatusRef = useRef('');
 
-  // Follow User Toggle
+  // Follow user toggle
   const [followUser, setFollowUser] = useState(true);
 
-  // Live User Location
+  // Live user location
   const [userCoordinates, setUserCoordinates] = useState({
     latitude: 22.72345,
     longitude: 75.8472,
   });
 
-  // Route Path
+  // Route path
   const [routeCoordinates, setRouteCoordinates] = useState<any[]>([]);
 
-  // Geofence Status
+  // Geofence status
   const [status, setStatus] = useState('Checking...');
+
+  // Selected point
+  const [selectedLocation, setSelectedLocation] = useState<any>(null);
+
+  // -----------------------------------
+  // MAP PRESS
+  // -----------------------------------
+
+  const handleMapPress = (event: any) => {
+    const coordinate = event.nativeEvent.coordinate;
+
+    setSelectedLocation(coordinate);
+
+    console.log('Selected Point:', coordinate);
+  };
 
   // -----------------------------------
   // CHECK GEOFENCE
   // -----------------------------------
+
   const checkGeofence = (latitude: number, longitude: number) => {
     const point = turf.point([longitude, latitude]);
 
@@ -85,9 +103,7 @@ const App: React.FC = () => {
 
     const isInside = turf.booleanPointInPolygon(point, polygon);
 
-    // -----------------------------
-    // USER INSIDE
-    // -----------------------------
+    // INSIDE
     if (isInside) {
       setStatus('Inside Geofence');
 
@@ -98,9 +114,7 @@ const App: React.FC = () => {
       }
     }
 
-    // -----------------------------
-    // USER OUTSIDE
-    // -----------------------------
+    // OUTSIDE
     else {
       setStatus('Outside Geofence');
 
@@ -115,18 +129,19 @@ const App: React.FC = () => {
   // -----------------------------------
   // INITIAL LOCATION
   // -----------------------------------
+
   const getInitialLocation = () => {
     Geolocation.getCurrentPosition(
       position => {
         const { latitude, longitude } = position.coords;
 
-        // Update Marker
+        // Update marker
         setUserCoordinates({
           latitude,
           longitude,
         });
 
-        // Initial Route Point
+        // Initial route point
         setRouteCoordinates([
           {
             latitude,
@@ -134,7 +149,7 @@ const App: React.FC = () => {
           },
         ]);
 
-        // Move Camera ONCE
+        // Move camera
         const region: Region = {
           latitude,
           longitude,
@@ -144,7 +159,7 @@ const App: React.FC = () => {
 
         mapRef.current?.animateToRegion(region, 1000);
 
-        // Geofence Check
+        // Check geofence
         checkGeofence(latitude, longitude);
       },
 
@@ -163,6 +178,7 @@ const App: React.FC = () => {
   // -----------------------------------
   // LIVE TRACKING
   // -----------------------------------
+
   useEffect(() => {
     getInitialLocation();
 
@@ -172,13 +188,13 @@ const App: React.FC = () => {
 
         console.log('Live Location:', latitude, longitude);
 
-        // Update User Marker
+        // Update user marker
         setUserCoordinates({
           latitude,
           longitude,
         });
 
-        // Save Limited Route Points
+        // Save route
         setRouteCoordinates(prev => {
           const updated = [
             ...prev,
@@ -188,11 +204,10 @@ const App: React.FC = () => {
             },
           ];
 
-          // Keep Last 100 Points
           return updated.slice(-100);
         });
 
-        // Camera Follow
+        // Camera follow
         if (followUser) {
           mapRef.current?.animateCamera({
             center: {
@@ -203,7 +218,7 @@ const App: React.FC = () => {
           });
         }
 
-        // Geofence Check
+        // Check geofence
         checkGeofence(latitude, longitude);
       },
 
@@ -212,22 +227,11 @@ const App: React.FC = () => {
       },
 
       {
-        // Battery Optimized
         enableHighAccuracy: false,
-
-        // Update only after 10 meters
         distanceFilter: 10,
-
-        // 5 seconds
         interval: 5000,
-
-        // Android Fastest
         fastestInterval: 3000,
-
-        // Cached Location Allowed
         maximumAge: 10000,
-
-        // Significant Change
         useSignificantChanges: true,
       },
     );
@@ -254,14 +258,24 @@ const App: React.FC = () => {
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         }}
+        onPress={handleMapPress}
       >
         {/* USER MARKER */}
         <Marker
           coordinate={userCoordinates}
-          title={status}
-          description="Live User"
+          title="Current Location"
+          description={status}
           pinColor="orange"
         />
+
+        {/* SELECTED POINT */}
+        {selectedLocation && (
+          <Marker
+            coordinate={selectedLocation}
+            title="Selected Point"
+            pinColor="green"
+          />
+        )}
 
         {/* LIVE ROUTE */}
         <Polyline
@@ -270,7 +284,7 @@ const App: React.FC = () => {
           strokeWidth={5}
         />
 
-        {/* GEOFENCE POLYGON */}
+        {/* GEOFENCE */}
         <Polygon
           coordinates={POLYGON_COORDINATES}
           strokeColor="rgba(0,0,255,0.8)"
